@@ -1,0 +1,27 @@
+library(Quandl)
+library(plotly)
+library(tidyverse)
+
+correlelo <- function(x, y, n){summary(lm(y ~ lag(x, n), data = dataset))$adj.r.squared}
+
+unemployment <- Quandl('FRED/NROUST') %>% dplyr::mutate(ur = Value) %>% dplyr::select(-Value)
+gdp <- Quandl('FRED/GDPPOT') %>% arrange(Date) %>%  mutate(qoq = Value / lag(Value, 1) - 1) %>% select(-Value)
+
+dataset <- inner_join(unemployment, gdp) %>% arrange(Date) %>% filter(!is.na(qoq))
+
+dataset %>% mutate(cor = correlelo(.$ur, .$qoq, 5))
+
+corset <- NULL  
+for(i in 1:nrow(dataset)-1){
+  tempcor <- correlelo(dataset$qoq, dataset$ur, i)
+  corset <- rbind(corset, tempcor)
+  rm(tempcor)
+}
+
+p <- corset %>% 
+  as.tibble() %>% 
+  mutate(lags = 1:nrow(dataset)) %>% 
+  select(lags, V1) %>%
+  ggplot(mapping = aes(x = lags, y = V1)) + geom_line() + labs(title = "Correlelo Lag Plot") + theme_classic()
+
+ggplotly(p) 
